@@ -184,6 +184,13 @@ export const cliOptions = {
     description:
       'Path to a file where MCP server logs will be written. Set DEBUG=* to also enable verbose debug logs.',
   },
+  selftest: {
+    type: 'boolean',
+    description:
+      'Verify the environment: build the toolset, launch (or connect to) Firefox, establish the ' +
+      'BiDi connection, then exit 0 on success or 1 on failure. Does not start the MCP server.',
+    default: false,
+  },
   tools: {
     type: 'array',
     string: true,

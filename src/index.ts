@@ -203,6 +203,21 @@ export async function run(
   }
   log(`Enabled tool modules: ${moduleNames.join(', ')}`);
 
+  // Self-test mode: verify the whole launch path without serving MCP.
+  if (args.selftest) {
+    try {
+      log(`Self-test: ${allTools.length} tools available in module set`);
+      const firefox = await getFirefox();
+      const browserVersion = firefox.getFirefoxVersion();
+      log(`Self-test OK: Firefox ${browserVersion ?? 'unknown version'} connected, BiDi ready`);
+      await firefox.close();
+      process.exit(0);
+    } catch (error) {
+      logError('Self-test FAILED', error);
+      process.exit(1);
+    }
+  }
+
   log(`Starting ${SERVER_NAME} v${SERVER_VERSION}`);
   log(`Node.js ${version}`);
 

@@ -11,7 +11,7 @@ Repository: https://github.com/lifestyle3nergy-web/firefox-devtools-mcp
 
 Forked from: https://github.com/mozilla/firefox-devtools-mcp (upstream, maintained by Mozilla)
 
-> **Note**: This MCP server requires a local Firefox browser installation and cannot run on cloud hosting services without a browser. Use `npx @lifestyle3nergy-web/firefox-devtools-mcp@latest` to run locally, or use Docker with the provided Dockerfile.
+> **Note**: This MCP server requires a local Firefox browser installation and cannot run on cloud hosting services without a browser. Use `npx @lifestyle3nergy-web/firefox-devtools-mcp@0.10.1` to run locally, or use Docker with the provided Dockerfile.
 
 ## Security
 
@@ -43,13 +43,13 @@ Recommended: use `npx` so you run the latest published version from npm.
 #### Claude Code
 
 ```bash
-claude mcp add firefox-devtools npx @lifestyle3nergy-web/firefox-devtools-mcp@latest
+claude mcp add firefox-devtools npx @lifestyle3nergy-web/firefox-devtools-mcp@0.10.1
 
 # Headless + viewport via args
-claude mcp add firefox-devtools npx @lifestyle3nergy-web/firefox-devtools-mcp@latest -- --headless --viewport 1280x720
+claude mcp add firefox-devtools npx @lifestyle3nergy-web/firefox-devtools-mcp@0.10.1 -- --headless --viewport 1280x720
 
 # Or via environment variables
-claude mcp add firefox-devtools npx @lifestyle3nergy-web/firefox-devtools-mcp@latest \
+claude mcp add firefox-devtools npx @lifestyle3nergy-web/firefox-devtools-mcp@0.10.1 \
   --env START_URL=https://example.com \
   --env FIREFOX_HEADLESS=true
 ```
@@ -57,17 +57,17 @@ claude mcp add firefox-devtools npx @lifestyle3nergy-web/firefox-devtools-mcp@la
 #### Codex
 
 ```bash
-codex mcp add firefox-devtools -- npx @lifestyle3nergy-web/firefox-devtools-mcp@latest
+codex mcp add firefox-devtools -- npx @lifestyle3nergy-web/firefox-devtools-mcp@0.10.1
 
 # Headless + viewport via args
 codex mcp add firefox-devtools -- \
-  npx @lifestyle3nergy-web/firefox-devtools-mcp@latest -- --headless --viewport 1280x720
+  npx @lifestyle3nergy-web/firefox-devtools-mcp@0.10.1 -- --headless --viewport 1280x720
 
 # Or via environment variables
 codex mcp add firefox-devtools \
   --env START_URL=https://example.com \
   --env FIREFOX_HEADLESS=true \
-  -- npx @lifestyle3nergy-web/firefox-devtools-mcp@latest
+  -- npx @lifestyle3nergy-web/firefox-devtools-mcp@0.10.1
 ```
 
 ### Option B — Edit the configuration file
@@ -81,7 +81,7 @@ Add to Claude Code’s mcp_settings.json:
   "mcpServers": {
     "firefox-devtools": {
       "command": "npx",
-      "args": ["-y", "@lifestyle3nergy-web/firefox-devtools-mcp@latest", "--headless", "--viewport", "1280x720"],
+      "args": ["-y", "@lifestyle3nergy-web/firefox-devtools-mcp@0.10.1", "--headless", "--viewport", "1280x720"],
       "env": {
         "START_URL": "about:blank"
       }
@@ -97,7 +97,7 @@ Add to ~/.codex/config.toml:
 ```toml
 [mcp_servers.firefox-devtools]
 command = "npx"
-args = ["-y", "@lifestyle3nergy-web/firefox-devtools-mcp@latest", "--headless", "--viewport", "1280x720"]
+args = ["-y", "@lifestyle3nergy-web/firefox-devtools-mcp@0.10.1", "--headless", "--viewport", "1280x720"]
 
 [mcp_servers.firefox-devtools.env]
 START_URL = "about:blank"
@@ -113,7 +113,7 @@ npm run setup
 ## Try it with MCP Inspector
 
 ```bash
-npx @modelcontextprotocol/inspector npx @lifestyle3nergy-web/firefox-devtools-mcp@latest --start-url https://example.com --headless
+npx @modelcontextprotocol/inspector npx @lifestyle3nergy-web/firefox-devtools-mcp@0.10.1 --start-url https://example.com --headless
 ```
 
 Then call tools like:
@@ -321,7 +321,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for more details on local development, te
     "mcpServers": {
       "firefox-devtools": {
         "command": "cmd",
-        "args": ["/c", "npx", "-y", "@lifestyle3nergy-web/firefox-devtools-mcp@latest"]
+        "args": ["/c", "npx", "-y", "@lifestyle3nergy-web/firefox-devtools-mcp@0.10.1"]
       }
     }
     ```
@@ -332,14 +332,19 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for more details on local development, te
     "mcpServers": {
       "firefox-devtools": {
         "command": "C:\\nvm4w\\nodejs\\npx.ps1",
-        "args": ["-y", "@lifestyle3nergy-web/firefox-devtools-mcp@latest"]
+        "args": ["-y", "@lifestyle3nergy-web/firefox-devtools-mcp@0.10.1"]
       }
     }
     ```
 
 ## Versioning
 
-- Pre‑1.0 API: versions start at `0.x`. Use `@latest` with npx for the newest release.
+- Pre‑1.0 API: versions start at `0.x`; minor versions may include breaking changes.
+- Client configurations in this repository (README examples, plugins) pin a
+  concrete version (e.g. `@0.10.1`) so upgrades happen explicitly. Bump the
+  pin only after reviewing the [changelog](CHANGELOG.md).
+- For one-off runs, `npx @lifestyle3nergy-web/firefox-devtools-mcp@latest`
+  fetches the newest published release.
 
 ## Contributing
 

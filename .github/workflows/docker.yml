@@ -40,6 +40,11 @@ jobs:
       - name: Smoke test server entry point
         run: docker run --rm firefox-devtools-mcp:ci node dist/index.js --help
 
+      # Full self-test: launches Firefox inside the container and verifies
+      # the BiDi connection (the de-facto health check for this image).
+      - name: Self-test in container
+        run: docker run --rm --shm-size=1g firefox-devtools-mcp:ci node dist/index.js --selftest --headless
+
       - name: Login to GHCR
         if: github.event_name == 'release' && github.event.action == 'published'
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
