@@ -12,6 +12,9 @@
  */
 
 import { execSync } from 'node:child_process';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, it, expect } from 'vitest';
 import { createTestFirefox, closeFirefox } from '../helpers/firefox.js';
 
@@ -46,19 +49,27 @@ describe('Firefox process leak guard', () => {
     }
 
     for (let cycle = 1; cycle <= CYCLES; cycle++) {
-      const firefox = await createTestFirefox();
+      // Use a unique temp profile so the session is identifiable on the
+      // process command line - the same shape as the production default
+      // (auto-profile), where the server always launches with --profile.
+      const profileDir = mkdtempSync(join(tmpdir(), 'fdmcp-leak-'));
+      try {
+        const firefox = await createTestFirefox({ headless: true, profilePath: profileDir });
 
-      // Prove the session is really alive before tearing it down, so a
-      // "leak" failure cannot be a false positive from a failed launch.
-      // refreshTabs() must be called first: getTabs() returns the cached
-      // list, which is empty until refreshed (and throws if the session
-      // is dead).
-      await firefox.refreshTabs();
-      const tabs = firefox.getTabs();
-      expect(tabs.length).toBeGreaterThan(0);
+        // Prove the session is really alive before tearing it down, so a
+        // "leak" failure cannot be a false positive from a failed launch.
+        // refreshTabs() must be called first: getTabs() returns the cached
+        // list, which is empty until refreshed (and throws if the session
+        // is dead).
+        await firefox.refreshTabs();
+        const tabs = firefox.getTabs();
+        expect(tabs.length).toBeGreaterThan(0);
 
-      await closeFirefox(firefox);
-      await expectNoLingeringProcesses();
+        await closeFirefox(firefox);
+        await expectNoLingeringProcesses();
+      } finally {
+        rmSync(profileDir, { recursive: true, force: true });
+      }
     }
   });
 });
