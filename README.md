@@ -20,6 +20,7 @@ Browser MCP servers carry inherent risks. A few key practices:
 - **Use a dedicated Firefox profile.** Never run the server against your regular profile — the agent has access to whatever the browser can reach, including cookies and saved sessions.
 - **Be cautious about which sites you visit.** Pages can return content designed to manipulate the agent (prompt injection). Stick to sites you control or trust.
 - **Enable only the tool modules you need.** The default `basic` preset already includes `evaluate_script`; `--tool-preset slim` drops it. Higher presets such as `--tool-preset developer` (debugging, network, console, profiler) and `--tool-preset mozilla` (privileged context) expand what the agent can do further.
+- **Understand the localhost trust model.** The server is stdio-only and authenticates nothing: access is bounded by your OS process isolation, and local browser endpoints (geckodriver, Marionette) are reached without shared secrets. See [SECURITY.md](SECURITY.md#localhost-trust-model).
 
 See [SECURITY.md](SECURITY.md) for a full breakdown of risks and how to report vulnerabilities.
 
@@ -123,6 +124,32 @@ Then call tools like:
 - `list_network_requests` (always‑on capture), `get_network_request`
 - `list_downloads` (always‑on capture), `set_download_behavior`
 - `screenshot_page`, `list_console_messages`
+
+## Docker
+
+The provided `Dockerfile` builds a self-contained image: Firefox (≥ 154, from
+the official Mozilla APT repository), the built server, required fonts, and a
+non-root user. Firefox is verified at build time, so a broken image is
+impossible by construction.
+
+```bash
+# Build locally
+docker build -t firefox-devtools-mcp .
+
+# Verify the image (launches Firefox in the container, checks the BiDi
+# connection, exits 0/1)
+docker run --rm --shm-size=1g firefox-devtools-mcp node dist/index.js --selftest --headless
+
+# Run the server (stdio MCP, as usual)
+docker run -i --rm firefox-devtools-mcp
+```
+
+Or use `docker compose up` (stdin/tty passthrough, named volume for profiles
+and captured logs). Release images are published as
+`ghcr.io/lifestyle3nergy-web/firefox-devtools-mcp:<tag>` (plus `latest`).
+Useful environment variables: `FIREFOX_HEADLESS`, `TOOL_PRESET`,
+`AUTO_PROFILE`, `START_URL`. See
+[docs/operations.md](docs/operations.md) for full Docker operations.
 
 ## CLI options
 

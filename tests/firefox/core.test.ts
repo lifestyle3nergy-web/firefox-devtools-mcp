@@ -365,6 +365,10 @@ describe('FirefoxCore connect() profile handling', () => {
       copyFileSync: vi.fn(),
       openSync: vi.fn().mockReturnValue(3),
       closeSync: vi.fn(),
+      // Used by rotateFirefoxLogs(); empty dir means nothing to rotate.
+      readdirSync: vi.fn().mockReturnValue([]),
+      statSync: vi.fn(),
+      unlinkSync: vi.fn(),
     }));
   });
 

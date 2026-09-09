@@ -12,6 +12,7 @@ import {
   readdirSync,
   statSync,
   readFileSync,
+  unlinkSync,
 } from 'node:fs';
 import { connect as netConnect } from 'node:net';
 import { homedir } from 'node:os';
@@ -150,6 +151,26 @@ async function findGeckodriver(): Promise<string> {
   return found;
 }
 
+const FIREFOX_LOG_RETAIN = 5;
+
+/**
+ * Keep at most FIREFOX_LOG_RETAIN firefox-*.log files in dir (newest kept).
+ * Best effort: failure must never break session startup.
+ */
+export function rotateFirefoxLogs(dir: string): void {
+  try {
+    const files = readdirSync(dir)
+      .filter((name) => /^firefox-.*\.log$/.test(name))
+      .map((name) => ({ path: join(dir, name), mtime: statSync(join(dir, name)).mtimeMs }))
+      .sort((a, b) => b.mtime - a.mtime);
+    for (const file of files.slice(FIREFOX_LOG_RETAIN)) {
+      unlinkSync(file.path);
+    }
+  } catch {
+    // best effort
+  }
+}
+
 export class FirefoxCore {
   private currentContextId: string | null = null;
   private driver: WebDriver | null = null;
@@ -271,12 +292,16 @@ export class FirefoxCore {
       // which would otherwise invoke selenium-manager with --browser firefox.
       this.driver = firefox.Driver.createSession(caps, serviceBuilder.build());
     } else {
-      // Set up output file for capturing Firefox stdout/stderr
+      // Set up output file for capturing Firefox stdout/stderr.
+      // Capture is always on for launched sessions so failures are
+      // diagnosable; --output-file overrides the location. The default
+      // directory is rotated (see rotateFirefoxLogs).
       if (this.options.logFile) {
         this.logFilePath = this.options.logFile;
-      } else if (this.options.env && Object.keys(this.options.env).length > 0) {
+      } else {
         const outputDir = join(homedir(), '.firefox-devtools-mcp', 'output');
         mkdirSync(outputDir, { recursive: true });
+        rotateFirefoxLogs(outputDir);
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
         this.logFilePath = join(outputDir, `firefox-${timestamp}.log`);
       }

@@ -54,7 +54,9 @@ export const handleGetFirefoxLogs = defineToolHandler(async (input: unknown) => 
 
   if (!logFilePath) {
     return successResponse(
-      'No output capture configured. Use --env to set environment variables or --output-file to enable output capture.'
+      'No output capture for this session (capture applies when the server launches Firefox; ' +
+        'connect-existing and Android sessions are not captured). Use --output-file to choose ' +
+        'the capture location for launched sessions.'
     );
   }
 

@@ -1,51 +1,77 @@
 # CI and Release
 
-This project ships with ready-to-use GitHub Actions for CI, release, and npm publishing.
+This project ships with ready-to-use GitHub Actions for CI, release, npm
+publishing, and Docker images.
 
-Workflows
-- CI (.github/workflows/ci.yml)
-  - Triggers on push (main, develop) and PRs.
-  - Matrix: Node 20 and 22.
-  - Steps: install → lint → format check → typecheck → test → build.
-  - Optional: uploads coverage to Codecov if `coverage/lcov.info` exists and `CODECOV_TOKEN` is set.
-  - Uploads the `dist/` artifact (Node 20 job) for quick download.
+## Workflows
 
-- PR Check (.github/workflows/pr-check.yml)
-  - Fast checks on PR open/update: lint, format check, typecheck.
+| Workflow | Trigger | What it does |
+| --- | --- | --- |
+| `ci.yml` | push to `main`, pull requests | Full matrix: **ubuntu + windows × Node 20 + 22**. install → production dependency audit (fail on high) → lint → format check → typecheck (src + tests) → build → install Firefox (`browser-actions/setup-firefox`) → `npm run test:coverage` (unit + integration). Integration tests are excluded on Windows (see [testing.md](testing.md)). Codecov upload and the `dist/` artifact run once (ubuntu, Node 20). |
+| `pr-check.yml` | PR opened/updated/reopened | Fast unit gate on one runner: lint, format, typecheck (src + tests), unit tests, build. |
+| `version-check.yml` | tag push `v*` | Fails if the tag version does not match `package.json`. Bump before tagging. |
+| `release.yml` | tag push `v*` | Full checks with a real Firefox (audit, build, `npm run test:run`), then creates a GitHub Release with a `dist` tarball and the built `.mcpb` bundle. Publishing the release triggers `publish.yml`. |
+| `publish.yml` | release published, manual dispatch | Re-runs checks, then publishes to npm: main package and the `-moz` variant. |
+| `docker.yml` | push to `main`, PRs, release published | Builds the image, verifies the bundled Firefox (`firefox --version` ≥ 154), smoke-tests the entry point, and runs `--selftest` (launches Firefox inside the container). On release published it pushes to `ghcr.io/lifestyle3nergy-web/firefox-devtools-mcp` tagged with the release tag plus `latest`. |
 
-- Version Check (.github/workflows/version-check.yml)
-  - On tag push `v*`: compares the tag version with `package.json`.
-  - Fails if they differ (bump package.json before tagging).
+Dependency updates: `dependabot.yml` opens weekly npm PRs (production
+dependencies only) and monthly GitHub Actions PRs.
 
-- Release (.github/workflows/release.yml)
-  - On tag push `v*`: runs tests, builds `dist/`, creates a GitHub Release with a tarball of `dist` + metadata.
+## CI design notes
 
-- Publish (.github/workflows/publish.yml)
-  - On GitHub Release published or on tag push `v*.*.*` (and via manual dispatch): builds and publishes to npm with provenance.
-  - Requires `NPM_TOKEN` repository secret.
+- **The coverage gate is the vitest threshold** in `vitest.config.ts`
+  (statements/branches/functions/lines floor), enforced on every
+  `test:coverage` run. The Codecov upload is informational only and is
+  configured with `fail_ci_if_error: false` so a missing `CODECOV_TOKEN`
+  never breaks CI (important for forks).
+- **Firefox is installed explicitly** (`browser-actions/setup-firefox`)
+  everywhere integration tests run — never relying on the runner image's
+  preinstalled browser.
+- **macOS is not in the matrix** yet: a known Firefox-startup crash there is
+  upstream and Firefox-side, not in this codebase (see [testing.md](testing.md)).
+- **Windows** runs the full pipeline with integration tests excluded
+  (selenium-webdriver hangs under vitest's process isolation).
+- The production **dependency audit** (`npm audit --omit=dev
+  --audit-level=high`) runs in `ci.yml` and both release workflows.
 
-Secrets
-- `NPM_TOKEN`: npm access token with publish rights to the package name (`firefox-devtools-mcp`).
-- `CODECOV_TOKEN` (optional): used by Codecov upload step (CI). The step is skipped if the token or coverage file is missing.
+## Secrets
 
-Release flow
-1) Bump version in `package.json` (keep 0.x until API is stable):
-   - `npm version patch` (or minor)
-   - Commit the change
-2) Create and push the tag (must match package.json):
-   - `git tag v0.2.0 && git push origin v0.2.0`
-3) The `version-check` job validates the tag vs. package.json.
-4) `release` creates a GitHub Release; `publish` publishes to npm.
+| Secret | Required | Purpose |
+| --- | --- | --- |
+| `NPM_TOKEN` | optional | Fallback npm auth: an npm automation token with publish rights on the `@lifestyle3nergy-web` scope. Only needed if you do **not** use trusted publishing. |
+| `CODECOV_TOKEN` | optional | Codecov upload in `ci.yml`. The upload is informational and never fails CI. |
 
-Windows Integration Tests
-- On Windows, vitest has known issues with process forking when running integration tests that spawn Firefox.
-- See: https://github.com/mozilla/firefox-devtools-mcp/issues/33
-- To work around this, we use a separate test runner (`scripts/run-integration-tests-windows.mjs`) that runs integration tests directly via Node.js without vitest's process isolation.
-- The CI workflow detects Windows and automatically uses this runner instead of vitest for integration tests.
-- Unit tests still run via vitest on all platforms.
+Publishing uses **npm trusted publishing (OIDC)** by default — no secret
+required. Configure it once in npmjs.com (Access → Publishing → Trusted
+publishing) for this repository; `publish.yml` then publishes with
+`--provenance`. If `NPM_TOKEN` is set, it is used instead (no provenance).
 
-Notes
-- If you want Codecov upload to run, switch CI test step to `npm run test:coverage` or generate `coverage/lcov.info`.
-- Provenance is enabled for npm publish (Node 20+).
-- Use `@latest` in README examples to encourage npx usage.
+## Release flow
 
+1. **Bump the version** and commit:
+   ```
+   node scripts/bump-version.mjs 0.11.0
+   git commit -am "chore: release 0.11.0"
+   ```
+   (`bump-version.mjs` updates `package.json` and `manifest.mcpb.json`.)
+2. **Tag and push** (the tag must match `package.json`):
+   ```
+   git tag v0.11.0 && git push origin v0.11.0
+   ```
+3. `version-check` validates tag ↔ package.json parity.
+4. `release` runs the full test suite with a real Firefox, then creates the
+   GitHub Release (dist tarball + `.mcpb`).
+5. Publishing the release triggers `publish` (npm, main + `-moz`) and
+   `docker` pushes the image to GHCR.
+
+Re-run a failed publish manually: Actions → `Publish to npm` → Run workflow
+(uses the release-published state of the selected ref).
+
+## Fork notes
+
+- npm **trusted publishing is configured per repository**; re-add it after
+  forking (or fall back to `NPM_TOKEN`).
+- The `@lifestyle3nergy-web` npm scope must exist (and the token/trusted
+  publisher have publish rights on it) before `publish` can succeed.
+- `ghcr.io/lifestyle3nergy-web` requires the GitHub organization/user to
+  exist; image visibility is set there (public by default for this project).

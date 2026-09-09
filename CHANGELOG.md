@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `--selftest` flag: verifies the toolset, Firefox launch, and BiDi connection, then exits 0/1 without starting the MCP server (container health check and CI smoke test)
+- TypeScript declaration files are now shipped in the npm package (`dist/index.d.ts`), so the `types` entry resolves
+- Protocol-level e2e test: drives the built `dist/index.js` with a real MCP client over stdio, asserts the served tool surface, and round-trips a tool call
+- Process-leak integration test: repeatedly launches and closes real Firefox sessions, asserting no geckodriver/Firefox test processes remain
+- Docker image is built and verified in CI (in-image Firefox version gate, entry-point smoke test, in-container `--selftest`) and pushed to `ghcr.io/lifestyle3nergy-web/firefox-devtools-mcp` on release
+- Production dependency audit gate (`npm audit --omit=dev --audit-level=high`) in CI and release workflows
+- Dependabot: weekly npm (production deps) and monthly GitHub Actions updates
+- `scripts/bump-version.mjs` to bump `package.json` and `manifest.mcpb.json` in one step
+- `version-check` CI job enforcing tag vs `package.json` version parity
+- `docs/operations.md` (operations runbook) and `docs/1.0-roadmap.md`
+- Localhost trust model section in `SECURITY.md`
+
+### Changed
+- Package renamed to `@lifestyle3nergy-web/firefox-devtools-mcp` (fork of `@mozilla/firefox-devtools-mcp`); install examples, plugin configs, and links point at the fork
+- Firefox output (stdout/stderr) is now always captured for sessions launched by the server, written to `~/.firefox-devtools-mcp/output/` with automatic rotation (last 5 files kept); `--output-file` still overrides the location
+- `@modelcontextprotocol/sdk` updated to 1.30.0 with a transitive dependency refresh (production audit: 0 vulnerabilities)
+- Dockerfile installs Firefox from the official Mozilla APT repository, gates on Firefox >= 154 at build time, and runs as a non-root user
+- CI matrix runs on ubuntu and windows (Node 20 and 22); integration tests remain excluded on Windows (known selenium-webdriver issue)
+- Coverage thresholds in `vitest.config.ts` raised to 60% statements / 50% branches / 60% functions / 60% lines
+- README and plugin configs pin the server to a concrete version instead of `@latest`, with an explicit upgrade policy
+- `.env.example` rewritten to document only variables the server actually reads
+- `get_firefox_output` reports clearly when a session has no capture (connect-existing/Android)
+- `Taskfile` `clean` no longer deletes `package-lock.json`
+- Publish workflow supports npm trusted publishing (OIDC) by default with an `NPM_TOKEN` fallback
+- `docs/ci-and-release.md` rewritten to match the actual workflows
+
+### Fixed
+- Release workflow no longer double-triggers the npm publish
+- CI runs on pull requests again (lost when the `develop` branch was dropped)
+
 ## [0.10.1] - 2026-08-21
 
 ### Added
