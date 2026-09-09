@@ -26,7 +26,13 @@ See [SECURITY.md](SECURITY.md) for a full breakdown of risks and how to report v
 ## Requirements
 
 - Node.js ≥ 20.19.0
-- Firefox 100+ installed (auto‑detected, or pass `--firefox-path`)
+- Firefox installed (auto‑detected, or pass `--firefox-path`). Minimum versions by module:
+  - `script` (JavaScript evaluation, included in the default `basic` preset): **Firefox 153+**
+  - `screencast`: **Firefox 154+** (also in the default `basic` preset)
+  - Everything else: Firefox 120+
+  - We recommend **Firefox ≥ 154** for full functionality with the default preset.
+  - If your Firefox is older, start the server with `--tool-preset slim` (or an explicit
+    `--tools` list without the unsupported modules).
 
 ## Install and use with Claude Code or Codex (npx)
 

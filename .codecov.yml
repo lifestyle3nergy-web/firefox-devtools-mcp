@@ -40,7 +40,6 @@ ignore:
   - "**/*.d.ts"
   - "**/*.config.*"
   - "**/*.test.ts"
-  - "old/**/*"
   - "tasks/**/*"
   - "docs/**/*"
 

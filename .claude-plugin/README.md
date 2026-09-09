@@ -7,43 +7,12 @@ Control Firefox for automated browsing, web testing, and debugging. Navigate pag
 - **MCP Server** - Connects Claude Code to Firefox via WebDriver BiDi
 - **Skill** - Auto-triggers for browser automation, testing, and debugging tasks
 - **Agents** - Dedicated `e2e-tester` and `web-extractor` agents for focused tasks
-- **Commands** - `/firefox-devtools-mcp:navigate`, `/firefox-devtools-mcp:screenshot`, `/firefox-devtools-mcp:debug`
 
 ## Installation
 
 ```bash
-/plugin marketplace add mozilla/firefox-devtools-mcp
+/plugin marketplace add lifestyle3nergy-web/firefox-devtools-mcp
 /plugin install firefox-devtools-mcp@firefox-devtools-plugins
-```
-
-## Commands
-
-### /firefox-devtools-mcp:navigate
-
-Navigate to a URL and take a DOM snapshot:
-
-```
-/firefox-devtools-mcp:navigate https://example.com
-/firefox-devtools-mcp:navigate https://github.com/login
-```
-
-### /firefox-devtools-mcp:screenshot
-
-Capture the current page or a specific element:
-
-```
-/firefox-devtools-mcp:screenshot
-/firefox-devtools-mcp:screenshot e15
-```
-
-### /firefox-devtools-mcp:debug
-
-Show console errors and failed network requests:
-
-```
-/firefox-devtools-mcp:debug
-/firefox-devtools-mcp:debug console
-/firefox-devtools-mcp:debug network
 ```
 
 ## Agents
@@ -72,10 +41,11 @@ The plugin works automatically when you ask about browser tasks:
 
 ## Default Configuration
 
-The plugin enables the following by default:
+The plugin starts the server with (see `plugins/firefox-devtools-mcp/.claude-plugin/plugin.json`):
 
-- **`--enable-script`** — enables JavaScript evaluation and debugging tools (`evaluate_script`, logpoints, script inspection). Requires Firefox 153+.
-- **`remote.prefs.recommended=false`** — skips WebDriver's automation preferences so Firefox behaves closer to a regular browser session. See [RecommendedPreferences](https://searchfox.org/firefox-main/source/remote/shared/RecommendedPreferences.sys.mjs) for what those preferences do.
+- **`--auto-profile`** — uses a persistent, dedicated profile under `~/.firefox-devtools-mcp/` instead of a fresh temporary profile per session.
+- **`--tool-preset developer`** — enables the developer tool preset: JavaScript evaluation and debugging tools (`evaluate_script`, logpoints, network, console, profiler). Requires Firefox 153+ for the script tools.
+- **`--pref remote.prefs.recommended=false`** — skips WebDriver's automation preferences so Firefox behaves closer to a regular browser session. See [RecommendedPreferences](https://searchfox.org/firefox-main/source/remote/shared/RecommendedPreferences.sys.mjs) for what those preferences do.
 
 ## Requirements
 
@@ -84,5 +54,6 @@ The plugin enables the following by default:
 
 ## Links
 
-- [Repository](https://github.com/mozilla/firefox-devtools-mcp)
+- [Repository](https://github.com/lifestyle3nergy-web/firefox-devtools-mcp)
+- [Upstream (Mozilla)](https://github.com/mozilla/firefox-devtools-mcp)
 - [npm](https://www.npmjs.com/package/@lifestyle3nergy-web/firefox-devtools-mcp)
