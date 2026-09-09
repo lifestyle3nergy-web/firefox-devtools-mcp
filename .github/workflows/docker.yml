@@ -1,0 +1,53 @@
+name: Docker Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  release:
+    types: [published]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  docker:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image
+        run: docker build -t firefox-devtools-mcp:ci .
+
+      - name: Check Firefox version in image
+        run: |
+          FIREFOX_VERSION=$(docker run --rm firefox-devtools-mcp:ci firefox --version)
+          echo "$FIREFOX_VERSION"
+          MAJOR=$(echo "$FIREFOX_VERSION" | grep -oE '[0-9]+' | head -1)
+          if [ "$MAJOR" -lt 154 ]; then
+            echo "ERROR: Firefox $MAJOR in image is older than 154"
+            exit 1
+          fi
+
+      - name: Smoke test server entry point
+        run: docker run --rm firefox-devtools-mcp:ci node dist/index.js --help
+
+      - name: Login to GHCR
+        if: github.event_name == 'release' && github.event.action == 'published'
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Tag and push image
+        if: github.event_name == 'release' && github.event.action == 'published'
+        run: |
+          docker tag firefox-devtools-mcp:ci "ghcr.io/${{ github.repository }}:${{ github.ref_name }}"
+          docker tag firefox-devtools-mcp:ci "ghcr.io/${{ github.repository }}:latest"
+          docker push "ghcr.io/${{ github.repository }}:${{ github.ref_name }}"
+          docker push "ghcr.io/${{ github.repository }}:latest"
