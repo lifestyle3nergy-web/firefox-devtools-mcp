@@ -50,7 +50,8 @@ describe('Firefox process leak guard', () => {
 
       // Prove the session is really alive before tearing it down, so a
       // "leak" failure cannot be a false positive from a failed launch.
-      const tabs = await firefox.getTabs();
+      // (getTabs is synchronous - do not await it.)
+      const tabs = firefox.getTabs();
       expect(tabs.length).toBeGreaterThan(0);
 
       await closeFirefox(firefox);
