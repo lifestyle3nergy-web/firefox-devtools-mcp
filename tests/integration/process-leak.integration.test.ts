@@ -50,7 +50,10 @@ describe('Firefox process leak guard', () => {
 
       // Prove the session is really alive before tearing it down, so a
       // "leak" failure cannot be a false positive from a failed launch.
-      // (getTabs is synchronous - do not await it.)
+      // refreshTabs() must be called first: getTabs() returns the cached
+      // list, which is empty until refreshed (and throws if the session
+      // is dead).
+      await firefox.refreshTabs();
       const tabs = firefox.getTabs();
       expect(tabs.length).toBeGreaterThan(0);
 
