@@ -168,7 +168,8 @@ describe('FirefoxCore', () => {
 
         const closePromise = core.close();
 
-        await vi.advanceTimersByTimeAsync(5500);
+        // The quit() timeout is 15000ms in close(); advance just past it.
+        await vi.advanceTimersByTimeAsync(15500);
         await closePromise;
 
         expect(onQuit).toHaveBeenCalled();
@@ -284,6 +285,20 @@ describe('FirefoxCore', () => {
           process.env.FIREFOX_MCP_TEST_EXISTING = savedExisting;
         }
       }
+    });
+
+    it('should complete when no browser process matches the session profile', async () => {
+      const core = new FirefoxCore({ headless: true });
+      (core as any).driver = {
+        quit: vi.fn().mockResolvedValue(undefined),
+      };
+      // A directory nothing is running with: the scoped process check finds
+      // no match and close() must neither hang nor throw.
+      (core as any).sessionProfileDir = '/tmp/fdmcp-close-test-definitely-missing';
+
+      await core.close();
+
+      expect((core as any).sessionProfileDir).toBeUndefined();
     });
   });
 });
