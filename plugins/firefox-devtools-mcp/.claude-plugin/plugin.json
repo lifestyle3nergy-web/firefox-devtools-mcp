@@ -5,15 +5,15 @@
     "name": "Mozilla",
     "url": "https://github.com/mozilla/firefox-devtools-mcp"
   },
-  "repository": "https://github.com/mozilla/firefox-devtools-mcp",
-  "homepage": "https://github.com/mozilla/firefox-devtools-mcp",
+  "repository": "https://github.com/lifestyle3nergy-web/firefox-devtools-mcp",
+  "homepage": "https://github.com/lifestyle3nergy-web/firefox-devtools-mcp",
   "license": "MIT OR Apache-2.0",
   "mcpServers": {
     "firefox-devtools": {
       "command": "npx",
       "args": [
         "-y",
-        "@mozilla/firefox-devtools-mcp@latest",
+        "@lifestyle3nergy-web/firefox-devtools-mcp@latest",
         "--auto-profile",
         "--tool-preset",
         "developer",

@@ -10,9 +10,9 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/mozilla/firefox-devtools-mcp.git"
+    "url": "https://github.com/lifestyle3nergy-web/firefox-devtools-mcp.git"
   },
-  "homepage": "https://github.com/mozilla/firefox-devtools-mcp",
+  "homepage": "https://github.com/lifestyle3nergy-web/firefox-devtools-mcp",
   "license": "MIT OR Apache-2.0",
   "server": {
     "type": "node",

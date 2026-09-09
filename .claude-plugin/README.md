@@ -85,4 +85,4 @@ The plugin enables the following by default:
 ## Links
 
 - [Repository](https://github.com/mozilla/firefox-devtools-mcp)
-- [npm](https://www.npmjs.com/package/@mozilla/firefox-devtools-mcp)
+- [npm](https://www.npmjs.com/package/@lifestyle3nergy-web/firefox-devtools-mcp)
