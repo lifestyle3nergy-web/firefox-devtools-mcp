@@ -2,9 +2,9 @@
  * Process-leak guard for FirefoxCore.close().
  *
  * Repeatedly launches and tears down a real Firefox session, asserting after
- * every close that no test geckodriver/Firefox processes survive. A failure
- * here almost always means cleanup in src/firefox/core.ts regressed (e.g.
- * after a selenium-webdriver upgrade changed its private internals).
+ * every close that no processes created by that cycle survive. A failure here
+ * almost always means cleanup in src/firefox/core.ts regressed (e.g. after a
+ * selenium-webdriver upgrade changed its private internals).
  *
  * Unix only: on Windows the integration tests are excluded by
  * vitest.config.ts (selenium-webdriver hangs; see docs/testing.md).
@@ -24,11 +24,15 @@ const POLL_INTERVAL_MS = 500;
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-/** PIDs of test geckodriver / marionette Firefox processes, '' if none. */
-function lingeringTestProcesses(profileDir: string): string {
-  // Match the launched Firefox by its unique per-cycle profile path. Avoid
-  // `pgrep -f "firefox.*marionette"`: the probe shell itself contains that
-  // pattern and can therefore be reported as a false positive.
+function processIdsByName(name: string): Set<string> {
+  const output = execSync(`pgrep -x ${name} || true`, { encoding: 'utf8' }).trim();
+  return new Set(output ? output.split(/\s+/).filter(Boolean) : []);
+}
+
+/** PIDs attributable to this test cycle, '' if none. */
+function lingeringTestProcesses(profileDir: string, baselineGeckodriver: Set<string>): string {
+  // Firefox is uniquely attributable to the cycle through its temporary
+  // profile. Matching the profile also avoids matching the pgrep probe itself.
   const escapedProfile = profileDir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const firefox = execSync(`pgrep -f "firefox.*${escapedProfile}" || true`, {
     encoding: 'utf8',
@@ -37,22 +41,25 @@ function lingeringTestProcesses(profileDir: string): string {
     .split(/\s+/)
     .filter(Boolean);
 
-  // Match geckodriver by executable name rather than full command line. Using
-  // `pgrep -f geckodriver` matches the shell and pgrep probe themselves.
-  const geckodriver = execSync('pgrep -x geckodriver || true', { encoding: 'utf8' })
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean);
+  // geckodriver does not include the Firefox profile in its command line.
+  // Compare against the pre-launch process set so unrelated geckodriver
+  // instances on a shared/parallel CI runner cannot create false positives.
+  const geckodriver = [...processIdsByName('geckodriver')].filter(
+    (pid) => !baselineGeckodriver.has(pid),
+  );
 
   return [...firefox, ...geckodriver].join(' ');
 }
 
-async function expectNoLingeringProcesses(profileDir: string): Promise<void> {
+async function expectNoLingeringProcesses(
+  profileDir: string,
+  baselineGeckodriver: Set<string>,
+): Promise<void> {
   const deadline = Date.now() + GRACE_PERIOD_MS;
-  let lingering = lingeringTestProcesses(profileDir);
+  let lingering = lingeringTestProcesses(profileDir, baselineGeckodriver);
   while (lingering && Date.now() < deadline) {
     await sleep(POLL_INTERVAL_MS);
-    lingering = lingeringTestProcesses(profileDir);
+    lingering = lingeringTestProcesses(profileDir, baselineGeckodriver);
   }
   expect(lingering, 'lingering test Firefox/geckodriver processes after close()').toBe('');
 }
@@ -65,24 +72,21 @@ describe('Firefox process leak guard', () => {
     }
 
     for (let cycle = 1; cycle <= CYCLES; cycle++) {
-      // Use a unique temp profile so the session is identifiable on the
-      // process command line - the same shape as the production default
-      // (auto-profile), where the server always launches with --profile.
+      // Capture unrelated geckodriver processes before launching this cycle.
+      // Only newly-created PIDs are eligible to be reported as leaks.
+      const baselineGeckodriver = processIdsByName('geckodriver');
       const profileDir = mkdtempSync(join(tmpdir(), 'fdmcp-leak-'));
       try {
         const firefox = await createTestFirefox({ headless: true, profilePath: profileDir });
 
         // Prove the session is really alive before tearing it down, so a
         // "leak" failure cannot be a false positive from a failed launch.
-        // refreshTabs() must be called first: getTabs() returns the cached
-        // list, which is empty until refreshed (and throws if the session
-        // is dead).
         await firefox.refreshTabs();
         const tabs = firefox.getTabs();
         expect(tabs.length).toBeGreaterThan(0);
 
         await closeFirefox(firefox);
-        await expectNoLingeringProcesses(profileDir);
+        await expectNoLingeringProcesses(profileDir, baselineGeckodriver);
       } finally {
         rmSync(profileDir, { recursive: true, force: true });
       }
