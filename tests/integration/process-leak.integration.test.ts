@@ -45,7 +45,7 @@ function lingeringTestProcesses(profileDir: string, baselineGeckodriver: Set<str
   // Compare against the pre-launch process set so unrelated geckodriver
   // instances on a shared/parallel CI runner cannot create false positives.
   const geckodriver = [...processIdsByName('geckodriver')].filter(
-    (pid) => !baselineGeckodriver.has(pid),
+    (pid) => !baselineGeckodriver.has(pid)
   );
 
   return [...firefox, ...geckodriver].join(' ');
@@ -53,7 +53,7 @@ function lingeringTestProcesses(profileDir: string, baselineGeckodriver: Set<str
 
 async function expectNoLingeringProcesses(
   profileDir: string,
-  baselineGeckodriver: Set<string>,
+  baselineGeckodriver: Set<string>
 ): Promise<void> {
   const deadline = Date.now() + GRACE_PERIOD_MS;
   let lingering = lingeringTestProcesses(profileDir, baselineGeckodriver);
