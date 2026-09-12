@@ -152,8 +152,35 @@ async function findGeckodriver(): Promise<string> {
   return found;
 }
 
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+function processIdsByName(name: string): Set<number> {
+  if (process.platform === 'win32') {
+    return new Set();
+  }
+  try {
+    const result = spawnSync('pgrep', ['-x', name], { encoding: 'utf8' });
+    return new Set(
+      result.stdout.trim().split(/\s+/).filter(Boolean).map(Number).filter(Number.isSafeInteger)
+    );
+  } catch {
+    return new Set();
+  }
+}
+
+function processIdsContaining(value: string): Set<number> {
+  if (process.platform === 'win32') {
+    return new Set();
+  }
+  try {
+    const result = spawnSync('ps', ['-eo', 'pid=,args='], { encoding: 'utf8' });
+    return new Set(
+      result.stdout
+        .split('\n')
+        .map((line) => line.match(/^\s*(\d+)\s+(.*)$/))
+        .flatMap((match) => (match?.[2]?.includes(value) ? [Number(match[1])] : []))
+    );
+  } catch {
+    return new Set();
+  }
 }
 
 const FIREFOX_LOG_RETAIN = 5;
@@ -185,6 +212,7 @@ export class FirefoxCore {
    * be used to verify/kill exactly this session's browser process.
    */
   private sessionProfileDir: string | undefined;
+  private sessionGeckodriverPid: number | undefined;
   private firefoxVersion: string | null = null;
   private logFileFd: number | undefined;
   private logFilePath: string | undefined;
@@ -197,6 +225,7 @@ export class FirefoxCore {
    * Launch Firefox (or connect to an existing instance) and establish BiDi connection
    */
   async connect(): Promise<void> {
+    const geckodriverBaseline = processIdsByName('geckodriver');
     const isAndroid = this.options.androidDevice !== undefined;
     const androidPackage = this.options.androidPackage ?? 'org.mozilla.firefox';
 
@@ -440,6 +469,13 @@ export class FirefoxCore {
     this.currentContextId = await this.driver.getWindowHandle();
     logDebug(`Browsing context ID: ${this.currentContextId}`);
 
+    const newGeckodriverPids = [...processIdsByName('geckodriver')].filter(
+      (pid) => !geckodriverBaseline.has(pid)
+    );
+    if (newGeckodriverPids.length === 1) {
+      this.sessionGeckodriverPid = newGeckodriverPids[0];
+    }
+
     // Navigate if startUrl provided (skip for connectExisting to not disrupt the user's browsing)
     if (this.options.startUrl && !this.options.connectExisting) {
       await this.driver.get(this.options.startUrl);
@@ -611,6 +647,7 @@ export class FirefoxCore {
     // slow machines can outlive this call. Verify this session's browser
     // process is actually gone before close() resolves.
     await this.ensureSessionBrowserGone();
+    await this.ensureSessionGeckodriverGone();
 
     // Close log file descriptor if open
     if (this.logFileFd !== undefined) {
@@ -650,27 +687,42 @@ export class FirefoxCore {
       return;
     }
 
-    const pattern = escapeRegExp(profileDir);
     for (let i = 0; i < 50; i++) {
-      if (!this.sessionProcessAlive(pattern)) {
+      if (processIdsContaining(profileDir).size === 0) {
         return;
       }
       await new Promise((resolve) => setTimeout(resolve, 200));
     }
 
     logDebug(`Session browser still running after close; killing (profile: ${profileDir})`);
-    try {
-      spawnSync('pkill', ['-9', '-f', pattern], { stdio: 'ignore' });
-    } catch {
-      // best effort
+    for (const pid of processIdsContaining(profileDir)) {
+      try {
+        process.kill(pid, 'SIGKILL');
+      } catch {
+        // already dead
+      }
     }
   }
 
-  private sessionProcessAlive(pattern: string): boolean {
+  private async ensureSessionGeckodriverGone(): Promise<void> {
+    const pid = this.sessionGeckodriverPid;
+    this.sessionGeckodriverPid = undefined;
+    if (pid === undefined || process.platform === 'win32') {
+      return;
+    }
+
+    for (let i = 0; i < 50; i++) {
+      if (!checkProcess(pid)) {
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    }
+
+    logDebug(`Session geckodriver still running after close; killing PID ${pid}`);
     try {
-      return spawnSync('pgrep', ['-f', pattern], { stdio: 'ignore' }).status === 0;
+      process.kill(pid, 'SIGKILL');
     } catch {
-      return false;
+      // already dead
     }
   }
 }

@@ -29,17 +29,19 @@ function processIdsByName(name: string): Set<string> {
   return new Set(output ? output.split(/\s+/).filter(Boolean) : []);
 }
 
+function processIdsContaining(value: string): string[] {
+  const output = execSync('ps -eo pid=,args=', { encoding: 'utf8' });
+  return output
+    .split('\n')
+    .map((line) => line.match(/^\s*(\d+)\s+(.*)$/))
+    .flatMap((match) => (match?.[2]?.includes(value) ? [match[1]] : []));
+}
+
 /** PIDs attributable to this test cycle, '' if none. */
 function lingeringTestProcesses(profileDir: string, baselineGeckodriver: Set<string>): string {
   // Firefox is uniquely attributable to the cycle through its temporary
-  // profile. Matching the profile also avoids matching the pgrep probe itself.
-  const escapedProfile = profileDir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const firefox = execSync(`pgrep -f "firefox.*${escapedProfile}" || true`, {
-    encoding: 'utf8',
-  })
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean);
+  // profile. Read the process table directly so the probe cannot match itself.
+  const firefox = processIdsContaining(profileDir);
 
   // geckodriver does not include the Firefox profile in its command line.
   // Compare against the pre-launch process set so unrelated geckodriver

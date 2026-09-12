@@ -294,11 +294,40 @@ describe('FirefoxCore', () => {
       };
       // A directory nothing is running with: the scoped process check finds
       // no match and close() must neither hang nor throw.
-      (core as any).sessionProfileDir = '/tmp/fdmcp-close-test-definitely-missing';
+      (core as any).sessionProfileDir = `/tmp/fdmcp-close-test-${process.pid}-${Date.now()}`;
 
       await core.close();
 
       expect((core as any).sessionProfileDir).toBeUndefined();
+    });
+
+    it('should clear an already-stopped session geckodriver PID', async () => {
+      const core = new FirefoxCore({ headless: true });
+      (core as any).driver = { quit: vi.fn().mockResolvedValue(undefined) };
+      (core as any).sessionGeckodriverPid = 2147483647;
+
+      await core.close();
+
+      expect((core as any).sessionGeckodriverPid).toBeUndefined();
+    });
+
+    it('should kill only the recorded geckodriver PID when it does not exit', async () => {
+      vi.useFakeTimers();
+      const kill = vi.spyOn(process, 'kill').mockImplementation(() => true);
+      try {
+        const core = new FirefoxCore({ headless: true });
+        (core as any).sessionGeckodriverPid = 424242;
+
+        const cleanup = (core as any).ensureSessionGeckodriverGone();
+        await vi.advanceTimersByTimeAsync(10_000);
+        await cleanup;
+
+        expect(kill).toHaveBeenLastCalledWith(424242, 'SIGKILL');
+        expect((core as any).sessionGeckodriverPid).toBeUndefined();
+      } finally {
+        kill.mockRestore();
+        vi.useRealTimers();
+      }
     });
   });
 });
