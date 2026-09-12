@@ -322,7 +322,11 @@ describe('FirefoxCore', () => {
         await vi.advanceTimersByTimeAsync(10_000);
         await cleanup;
 
-        expect(kill).toHaveBeenLastCalledWith(424242, 'SIGKILL');
+        if (process.platform === 'win32') {
+          expect(kill).not.toHaveBeenCalled();
+        } else {
+          expect(kill).toHaveBeenLastCalledWith(424242, 'SIGKILL');
+        }
         expect((core as any).sessionGeckodriverPid).toBeUndefined();
       } finally {
         kill.mockRestore();
