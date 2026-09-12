@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   firefox-devtools-mcp:
     build:
@@ -7,35 +5,21 @@ services:
       dockerfile: Dockerfile
     image: firefox-devtools-mcp:latest
     container_name: firefox-devtools-mcp
+    # The MCP server speaks over stdio: keep stdin open and a TTY so MCP
+    # clients (or `docker attach`) can talk to it.
     stdin_open: true
     tty: true
     environment:
       - NODE_ENV=production
-      - RDP_HOST=127.0.0.1
-      - RDP_PORT=6000
       - FIREFOX_HEADLESS=true
-      - AUTO_LAUNCH_FIREFOX=false
-      - VIEWPORT=1280x720
-      - DEBUG=
-    # If you want to connect to Firefox running on host
-    # network_mode: "host"
-    # Or expose RDP port
-    # ports:
-    #   - "6000:6000"
+      - TOOL_PRESET=basic
+      - AUTO_PROFILE=true
+      - START_URL=about:blank
+      # - DEBUG=firefox-devtools
     volumes:
-      # Mount dist for quick testing
-      - ./dist:/app/dist:ro
+      # Persist the dedicated Firefox profile and saved outputs
+      - firefox-mcp-data:/home/nodejs/.firefox-devtools-mcp
     restart: unless-stopped
 
-  # Optional: Firefox with RDP enabled for testing
-  firefox:
-    image: selenium/standalone-firefox:latest
-    container_name: firefox-rdp
-    ports:
-      - "6000:6000"
-      - "7900:7900"  # VNC port for viewing
-    environment:
-      - SE_NODE_MAX_SESSIONS=1
-      - SE_NODE_SESSION_TIMEOUT=300
-    shm_size: 2gb
-    restart: unless-stopped
+volumes:
+  firefox-mcp-data:

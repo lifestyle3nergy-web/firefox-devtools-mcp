@@ -164,14 +164,10 @@ Thumbs.db
 .temp/
 
 # Docker artifacts
-.dockerignore
 docker-compose.override.yml
 
 # Task runner
 .task/
-
-# LLM cache
-/old/*
 
 # Test snapshots
 snapshot-*.txt

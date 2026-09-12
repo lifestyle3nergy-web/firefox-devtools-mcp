@@ -1,0 +1,30 @@
+# Version control
+.git
+.github
+
+# Dependencies and build output (rebuilt inside the image)
+node_modules
+dist
+dist.moz
+dist-mcpb
+coverage
+package.moz.json
+
+# Tests, docs and tooling (not needed to build or run the server)
+tests
+scripts
+docs
+plugins
+.claude
+.claude-plugin
+
+# Local environment and logs
+.env
+.env.example
+*.log
+
+# IDE / OS
+.vscode
+.idea
+.DS_Store
+Thumbs.db

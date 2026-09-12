@@ -28,9 +28,11 @@ tasks:
       - npm start
 
   clean:
-    desc: Clean build artifacts
+    desc: Clean build artifacts (never removes package-lock.json)
     cmds:
-      - node -e "for (const p of ['dist', 'node_modules', 'package-lock.json']) require('node:fs').rmSync(p, {recursive:true, force:true})"
+      # WARNING: Do not add package-lock.json to this list - it is required
+      # for reproducible installs (npm ci).
+      - node -e "for (const p of ['dist', 'dist.moz', 'dist-mcpb', 'coverage', 'package.moz.json']) require('node:fs').rmSync(p, {recursive:true, force:true})"
 
   typecheck:
     desc: Run TypeScript type checking

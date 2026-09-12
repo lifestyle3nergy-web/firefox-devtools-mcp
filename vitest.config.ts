@@ -17,18 +17,20 @@ export default defineConfig({
       exclude: [
         'node_modules/**',
         'dist/**',
-        'old/**',
         '**/*.d.ts',
         '**/*.config.*',
         '**/mockData.ts',
         'tests/**',
         'scripts/**',
       ],
+      // Real gate (kept in sync with the Codecov targets in .codecov.yml;
+      // ratchet up over time). Measured floor: unit-only run at 63% stmts /
+      // 56% branches; the full run (unit + integration) is always higher.
       thresholds: {
-        branches: 10,
-        functions: 10,
-        lines: 10,
-        statements: 10,
+        branches: 50,
+        functions: 60,
+        lines: 60,
+        statements: 60,
       },
     },
     include: ['tests/**/*.test.ts'],

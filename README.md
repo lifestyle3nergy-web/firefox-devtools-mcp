@@ -1,17 +1,17 @@
 # Firefox DevTools MCP
 
-[![npm version](https://badge.fury.io/js/@mozilla%2Ffirefox-devtools-mcp.svg)](https://www.npmjs.com/package/mozilla/firefox-devtools-mcp)
-[![CI](https://github.com/mozilla/firefox-devtools-mcp/workflows/CI/badge.svg)](https://github.com/mozilla/firefox-devtools-mcp/actions/workflows/ci.yml)
-[![codecov](https://codecov.io/gh/mozilla/firefox-devtools-mcp/branch/main/graph/badge.svg)](https://codecov.io/gh/mozilla/firefox-devtools-mcp)
+[![npm version](https://badge.fury.io/js/@lifestyle3nergy-web%2Ffirefox-devtools-mcp.svg)](https://www.npmjs.com/package/@lifestyle3nergy-web%2Ffirefox-devtools-mcp)
+[![CI](https://github.com/lifestyle3nergy-web/firefox-devtools-mcp/workflows/CI/badge.svg)](https://github.com/lifestyle3nergy-web/firefox-devtools-mcp/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/lifestyle3nergy-web/firefox-devtools-mcp/branch/main/graph/badge.svg)](https://codecov.io/gh/lifestyle3nergy-web/firefox-devtools-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE-MIT) [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE-APACHE)
-
-<a href="https://glama.ai/mcp/servers/@mozilla/firefox-devtools-mcp"><img src="https://glama.ai/mcp/servers/@mozilla/firefox-devtools-mcp/badge" height="223" alt="Glama"></a>
 
 Model Context Protocol server for automating Firefox via WebDriver BiDi (through Selenium WebDriver). Works with Claude Code, Claude Desktop, Cursor, Cline and other MCP clients.
 
-Repository: https://github.com/mozilla/firefox-devtools-mcp
+Repository: https://github.com/lifestyle3nergy-web/firefox-devtools-mcp
 
-> **Note**: This MCP server requires a local Firefox browser installation and cannot run on cloud hosting services like glama.ai. Use `npx @mozilla/firefox-devtools-mcp@latest` to run locally, or use Docker with the provided Dockerfile.
+Forked from: https://github.com/mozilla/firefox-devtools-mcp (upstream, maintained by Mozilla)
+
+> **Note**: This MCP server requires a local Firefox browser installation and cannot run on cloud hosting services without a browser. Use `npx @lifestyle3nergy-web/firefox-devtools-mcp@0.10.1` to run locally, or use Docker with the provided Dockerfile.
 
 ## Security
 
@@ -20,13 +20,20 @@ Browser MCP servers carry inherent risks. A few key practices:
 - **Use a dedicated Firefox profile.** Never run the server against your regular profile — the agent has access to whatever the browser can reach, including cookies and saved sessions.
 - **Be cautious about which sites you visit.** Pages can return content designed to manipulate the agent (prompt injection). Stick to sites you control or trust.
 - **Enable only the tool modules you need.** The default `basic` preset already includes `evaluate_script`; `--tool-preset slim` drops it. Higher presets such as `--tool-preset developer` (debugging, network, console, profiler) and `--tool-preset mozilla` (privileged context) expand what the agent can do further.
+- **Understand the localhost trust model.** The server is stdio-only and authenticates nothing: access is bounded by your OS process isolation, and local browser endpoints (geckodriver, Marionette) are reached without shared secrets. See [SECURITY.md](SECURITY.md#localhost-trust-model).
 
 See [SECURITY.md](SECURITY.md) for a full breakdown of risks and how to report vulnerabilities.
 
 ## Requirements
 
 - Node.js ≥ 20.19.0
-- Firefox 100+ installed (auto‑detected, or pass `--firefox-path`)
+- Firefox installed (auto‑detected, or pass `--firefox-path`). Minimum versions by module:
+  - `script` (JavaScript evaluation, included in the default `basic` preset): **Firefox 153+**
+  - `screencast`: **Firefox 154+** (also in the default `basic` preset)
+  - Everything else: Firefox 120+
+  - We recommend **Firefox ≥ 154** for full functionality with the default preset.
+  - If your Firefox is older, start the server with `--tool-preset slim` (or an explicit
+    `--tools` list without the unsupported modules).
 
 ## Install and use with Claude Code or Codex (npx)
 
@@ -37,13 +44,13 @@ Recommended: use `npx` so you run the latest published version from npm.
 #### Claude Code
 
 ```bash
-claude mcp add firefox-devtools npx @mozilla/firefox-devtools-mcp@latest
+claude mcp add firefox-devtools npx @lifestyle3nergy-web/firefox-devtools-mcp@0.10.1
 
 # Headless + viewport via args
-claude mcp add firefox-devtools npx @mozilla/firefox-devtools-mcp@latest -- --headless --viewport 1280x720
+claude mcp add firefox-devtools npx @lifestyle3nergy-web/firefox-devtools-mcp@0.10.1 -- --headless --viewport 1280x720
 
 # Or via environment variables
-claude mcp add firefox-devtools npx @mozilla/firefox-devtools-mcp@latest \
+claude mcp add firefox-devtools npx @lifestyle3nergy-web/firefox-devtools-mcp@0.10.1 \
   --env START_URL=https://example.com \
   --env FIREFOX_HEADLESS=true
 ```
@@ -51,17 +58,17 @@ claude mcp add firefox-devtools npx @mozilla/firefox-devtools-mcp@latest \
 #### Codex
 
 ```bash
-codex mcp add firefox-devtools -- npx @mozilla/firefox-devtools-mcp@latest
+codex mcp add firefox-devtools -- npx @lifestyle3nergy-web/firefox-devtools-mcp@0.10.1
 
 # Headless + viewport via args
 codex mcp add firefox-devtools -- \
-  npx @mozilla/firefox-devtools-mcp@latest -- --headless --viewport 1280x720
+  npx @lifestyle3nergy-web/firefox-devtools-mcp@0.10.1 -- --headless --viewport 1280x720
 
 # Or via environment variables
 codex mcp add firefox-devtools \
   --env START_URL=https://example.com \
   --env FIREFOX_HEADLESS=true \
-  -- npx @mozilla/firefox-devtools-mcp@latest
+  -- npx @lifestyle3nergy-web/firefox-devtools-mcp@0.10.1
 ```
 
 ### Option B — Edit the configuration file
@@ -75,7 +82,7 @@ Add to Claude Code’s mcp_settings.json:
   "mcpServers": {
     "firefox-devtools": {
       "command": "npx",
-      "args": ["-y", "@mozilla/firefox-devtools-mcp@latest", "--headless", "--viewport", "1280x720"],
+      "args": ["-y", "@lifestyle3nergy-web/firefox-devtools-mcp@0.10.1", "--headless", "--viewport", "1280x720"],
       "env": {
         "START_URL": "about:blank"
       }
@@ -91,7 +98,7 @@ Add to ~/.codex/config.toml:
 ```toml
 [mcp_servers.firefox-devtools]
 command = "npx"
-args = ["-y", "@mozilla/firefox-devtools-mcp@latest", "--headless", "--viewport", "1280x720"]
+args = ["-y", "@lifestyle3nergy-web/firefox-devtools-mcp@0.10.1", "--headless", "--viewport", "1280x720"]
 
 [mcp_servers.firefox-devtools.env]
 START_URL = "about:blank"
@@ -107,7 +114,7 @@ npm run setup
 ## Try it with MCP Inspector
 
 ```bash
-npx @modelcontextprotocol/inspector npx @mozilla/firefox-devtools-mcp@latest --start-url https://example.com --headless
+npx @modelcontextprotocol/inspector npx @lifestyle3nergy-web/firefox-devtools-mcp@0.10.1 --start-url https://example.com --headless
 ```
 
 Then call tools like:
@@ -117,6 +124,32 @@ Then call tools like:
 - `list_network_requests` (always‑on capture), `get_network_request`
 - `list_downloads` (always‑on capture), `set_download_behavior`
 - `screenshot_page`, `list_console_messages`
+
+## Docker
+
+The provided `Dockerfile` builds a self-contained image: Firefox (≥ 154, from
+the official Mozilla APT repository), the built server, required fonts, and a
+non-root user. Firefox is verified at build time, so a broken image is
+impossible by construction.
+
+```bash
+# Build locally
+docker build -t firefox-devtools-mcp .
+
+# Verify the image (launches Firefox in the container, checks the BiDi
+# connection, exits 0/1)
+docker run --rm --shm-size=1g firefox-devtools-mcp node dist/index.js --selftest --headless
+
+# Run the server (stdio MCP, as usual)
+docker run -i --rm firefox-devtools-mcp
+```
+
+Or use `docker compose up` (stdin/tty passthrough, named volume for profiles
+and captured logs). Release images are published as
+`ghcr.io/lifestyle3nergy-web/firefox-devtools-mcp:<tag>` (plus `latest`).
+Useful environment variables: `FIREFOX_HEADLESS`, `TOOL_PRESET`,
+`AUTO_PROFILE`, `START_URL`. See
+[docs/operations.md](docs/operations.md) for full Docker operations.
 
 ## CLI options
 
@@ -167,10 +200,10 @@ surface, and use `--tool-preset slim` or an explicit `--tools` list to drop it.
 
 ```bash
 # Use the developer preset (adds network, console, debugging and profiler tools)
-npx @mozilla/firefox-devtools-mcp --tool-preset developer
+npx @lifestyle3nergy-web/firefox-devtools-mcp --tool-preset developer
 
 # Enable only the modules you need
-npx @mozilla/firefox-devtools-mcp --tools pages network console
+npx @lifestyle3nergy-web/firefox-devtools-mcp --tools pages network console
 ```
 
 The `prefs` and `privileged` modules require `MOZ_REMOTE_ALLOW_SYSTEM_ACCESS=1` and are only
@@ -201,13 +234,13 @@ Use `--android-device` to automate Firefox running on an Android device. Require
 adb devices
 
 # Launch Firefox for Android on the single connected device
-npx @mozilla/firefox-devtools-mcp --android-device auto --android-wipe-app-data
+npx @lifestyle3nergy-web/firefox-devtools-mcp --android-device auto --android-wipe-app-data
 
 # Target a specific device
-npx @mozilla/firefox-devtools-mcp --android-device <serial> --android-wipe-app-data
+npx @lifestyle3nergy-web/firefox-devtools-mcp --android-device <serial> --android-wipe-app-data
 
 # Use Firefox Nightly instead
-npx @mozilla/firefox-devtools-mcp --android-device <serial> --android-package org.mozilla.fenix --android-wipe-app-data
+npx @lifestyle3nergy-web/firefox-devtools-mcp --android-device <serial> --android-package org.mozilla.fenix --android-wipe-app-data
 ```
 
 Port forwarding between the host and device is handled automatically by geckodriver.
@@ -221,7 +254,7 @@ Use `--connect-existing` to automate your real browsing session, with cookies, l
 firefox --marionette --remote-debugging-port
 
 # Run the MCP server
-npx @mozilla/firefox-devtools-mcp --connect-existing --marionette-port 2828
+npx @lifestyle3nergy-web/firefox-devtools-mcp --connect-existing --marionette-port 2828
 ```
 
 Both flags are required because the MCP uses both WebDriver Classic (`--marionette`) and WebDriver BiDi (`--remote-debugging-port`). If Firefox is only started with `--marionette`, the MCP server fails to connect and asks you to restart Firefox with both flags.
@@ -315,7 +348,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for more details on local development, te
     "mcpServers": {
       "firefox-devtools": {
         "command": "cmd",
-        "args": ["/c", "npx", "-y", "@mozilla/firefox-devtools-mcp@latest"]
+        "args": ["/c", "npx", "-y", "@lifestyle3nergy-web/firefox-devtools-mcp@0.10.1"]
       }
     }
     ```
@@ -326,14 +359,19 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for more details on local development, te
     "mcpServers": {
       "firefox-devtools": {
         "command": "C:\\nvm4w\\nodejs\\npx.ps1",
-        "args": ["-y", "@mozilla/firefox-devtools-mcp@latest"]
+        "args": ["-y", "@lifestyle3nergy-web/firefox-devtools-mcp@0.10.1"]
       }
     }
     ```
 
 ## Versioning
 
-- Pre‑1.0 API: versions start at `0.x`. Use `@latest` with npx for the newest release.
+- Pre‑1.0 API: versions start at `0.x`; minor versions may include breaking changes.
+- Client configurations in this repository (README examples, plugins) pin a
+  concrete version (e.g. `@0.10.1`) so upgrades happen explicitly. Bump the
+  pin only after reviewing the [changelog](CHANGELOG.md).
+- For one-off runs, `npx @lifestyle3nergy-web/firefox-devtools-mcp@latest`
+  fetches the newest published release.
 
 ## Contributing
 
@@ -341,7 +379,9 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for how to file issues, run tests, and wo
 
 ## Author
 
-Maintained by [Mozilla](https://www.mozilla.org).
+This fork is maintained by lifestyle3nergy-web.
+The original project is maintained by [Mozilla](https://www.mozilla.org)
+(see [upstream repository](https://github.com/mozilla/firefox-devtools-mcp)).
 
 ## License
 

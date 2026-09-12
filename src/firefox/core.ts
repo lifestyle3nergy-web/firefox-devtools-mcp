@@ -12,7 +12,9 @@ import {
   readdirSync,
   statSync,
   readFileSync,
+  unlinkSync,
 } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { connect as netConnect } from 'node:net';
 import { homedir } from 'node:os';
 import { dirname, join, delimiter } from 'node:path';
@@ -150,9 +152,67 @@ async function findGeckodriver(): Promise<string> {
   return found;
 }
 
+function processIdsByName(name: string): Set<number> {
+  if (process.platform === 'win32') {
+    return new Set();
+  }
+  try {
+    const result = spawnSync('pgrep', ['-x', name], { encoding: 'utf8' });
+    return new Set(
+      result.stdout.trim().split(/\s+/).filter(Boolean).map(Number).filter(Number.isSafeInteger)
+    );
+  } catch {
+    return new Set();
+  }
+}
+
+function processIdsContaining(value: string): Set<number> {
+  if (process.platform === 'win32') {
+    return new Set();
+  }
+  try {
+    const result = spawnSync('ps', ['-eo', 'pid=,args='], { encoding: 'utf8' });
+    return new Set(
+      result.stdout
+        .split('\n')
+        .map((line) => line.match(/^\s*(\d+)\s+(.*)$/))
+        .flatMap((match) => (match?.[2]?.includes(value) ? [Number(match[1])] : []))
+    );
+  } catch {
+    return new Set();
+  }
+}
+
+const FIREFOX_LOG_RETAIN = 5;
+
+/**
+ * Keep at most FIREFOX_LOG_RETAIN firefox-*.log files in dir (newest kept).
+ * Best effort: failure must never break session startup.
+ */
+export function rotateFirefoxLogs(dir: string): void {
+  try {
+    const files = readdirSync(dir)
+      .filter((name) => /^firefox-.*\.log$/.test(name))
+      .map((name) => ({ path: join(dir, name), mtime: statSync(join(dir, name)).mtimeMs }))
+      .sort((a, b) => b.mtime - a.mtime);
+    for (const file of files.slice(FIREFOX_LOG_RETAIN)) {
+      unlinkSync(file.path);
+    }
+  } catch {
+    // best effort
+  }
+}
+
 export class FirefoxCore {
   private currentContextId: string | null = null;
   private driver: WebDriver | null = null;
+  /**
+   * Profile directory of the launched session (desktop path only). Unique
+   * per session and present in the Firefox process command line, so it can
+   * be used to verify/kill exactly this session's browser process.
+   */
+  private sessionProfileDir: string | undefined;
+  private sessionGeckodriverPid: number | undefined;
   private firefoxVersion: string | null = null;
   private logFileFd: number | undefined;
   private logFilePath: string | undefined;
@@ -165,6 +225,7 @@ export class FirefoxCore {
    * Launch Firefox (or connect to an existing instance) and establish BiDi connection
    */
   async connect(): Promise<void> {
+    const geckodriverBaseline = processIdsByName('geckodriver');
     const isAndroid = this.options.androidDevice !== undefined;
     const androidPackage = this.options.androidPackage ?? 'org.mozilla.firefox';
 
@@ -271,12 +332,16 @@ export class FirefoxCore {
       // which would otherwise invoke selenium-manager with --browser firefox.
       this.driver = firefox.Driver.createSession(caps, serviceBuilder.build());
     } else {
-      // Set up output file for capturing Firefox stdout/stderr
+      // Set up output file for capturing Firefox stdout/stderr.
+      // Capture is always on for launched sessions so failures are
+      // diagnosable; --output-file overrides the location. The default
+      // directory is rotated (see rotateFirefoxLogs).
       if (this.options.logFile) {
         this.logFilePath = this.options.logFile;
-      } else if (this.options.env && Object.keys(this.options.env).length > 0) {
+      } else {
         const outputDir = join(homedir(), '.firefox-devtools-mcp', 'output');
         mkdirSync(outputDir, { recursive: true });
+        rotateFirefoxLogs(outputDir);
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
         this.logFilePath = join(outputDir, `firefox-${timestamp}.log`);
       }
@@ -332,6 +397,7 @@ export class FirefoxCore {
         // Use Firefox's native --profile argument for reliable profile loading
         // (Selenium's setProfile() copies to temp dir which can be unreliable)
         firefoxOptions.addArguments('--profile', resolvedProfilePath);
+        this.sessionProfileDir = resolvedProfilePath;
         log(`Using Firefox profile: ${resolvedProfilePath}`);
       }
       if (this.options.acceptInsecureCerts) {
@@ -402,6 +468,13 @@ export class FirefoxCore {
     // Remember current window handle (browsing context)
     this.currentContextId = await this.driver.getWindowHandle();
     logDebug(`Browsing context ID: ${this.currentContextId}`);
+
+    const newGeckodriverPids = [...processIdsByName('geckodriver')].filter(
+      (pid) => !geckodriverBaseline.has(pid)
+    );
+    if (newGeckodriverPids.length === 1) {
+      this.sessionGeckodriverPid = newGeckodriverPids[0];
+    }
 
     // Navigate if startUrl provided (skip for connectExisting to not disrupt the user's browsing)
     if (this.options.startUrl && !this.options.connectExisting) {
@@ -522,7 +595,10 @@ export class FirefoxCore {
     }
 
     const webdriver = this.driver as any; // Selenium WebDriver
-    const webdriverQuitTimeout = 5000;
+    // A fresh headless Firefox on a loaded machine can need more than a
+    // few seconds to shut down gracefully; force-killing geckodriver too
+    // early orphans the browser, so give quit() a generous window.
+    const webdriverQuitTimeout = 15000;
 
     // Null to prevent re-entrancy
     this.driver = null;
@@ -566,6 +642,13 @@ export class FirefoxCore {
       }
     }
 
+    // quit() and the onQuit_ fallback target geckodriver; the launched
+    // Firefox itself only dies when the session close completes, which on
+    // slow machines can outlive this call. Verify this session's browser
+    // process is actually gone before close() resolves.
+    await this.ensureSessionBrowserGone();
+    await this.ensureSessionGeckodriverGone();
+
     // Close log file descriptor if open
     if (this.logFileFd !== undefined) {
       try {
@@ -590,5 +673,56 @@ export class FirefoxCore {
     this.originalEnv = {};
 
     log('Firefox DevTools closed');
+  }
+
+  /**
+   * Wait for the launched browser process of this session to exit, killing
+   * it (scoped to the session profile directory) if it is stuck. No-op for
+   * connect-existing/Android sessions and on Windows (no scoped pkill).
+   */
+  private async ensureSessionBrowserGone(): Promise<void> {
+    const profileDir = this.sessionProfileDir;
+    this.sessionProfileDir = undefined;
+    if (!profileDir || process.platform === 'win32') {
+      return;
+    }
+
+    for (let i = 0; i < 50; i++) {
+      if (processIdsContaining(profileDir).size === 0) {
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    }
+
+    logDebug(`Session browser still running after close; killing (profile: ${profileDir})`);
+    for (const pid of processIdsContaining(profileDir)) {
+      try {
+        process.kill(pid, 'SIGKILL');
+      } catch {
+        // already dead
+      }
+    }
+  }
+
+  private async ensureSessionGeckodriverGone(): Promise<void> {
+    const pid = this.sessionGeckodriverPid;
+    this.sessionGeckodriverPid = undefined;
+    if (pid === undefined || process.platform === 'win32') {
+      return;
+    }
+
+    for (let i = 0; i < 50; i++) {
+      if (!checkProcess(pid)) {
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    }
+
+    logDebug(`Session geckodriver still running after close; killing PID ${pid}`);
+    try {
+      process.kill(pid, 'SIGKILL');
+    } catch {
+      // already dead
+    }
   }
 }

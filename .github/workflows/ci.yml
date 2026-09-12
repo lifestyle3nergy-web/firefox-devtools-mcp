@@ -2,7 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main]
+  pull_request:
+    types: [opened, synchronize, reopened]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -10,11 +12,15 @@ concurrency:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    # macOS is not in the matrix yet: an intermittent Firefox startup crash
+    # (RegisterFonts, Bug 2027228) is upstream/Firefox-side, not in this
+    # codebase (see docs/testing.md).
     strategy:
       fail-fast: false
       matrix:
+        os: [ubuntu-latest, windows-latest]
         node-version: [20, 22]
+    runs-on: ${{ matrix.os }}
 
     steps:
       - name: Checkout
@@ -28,6 +34,9 @@ jobs:
 
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
+
+      - name: Dependency audit (production, fail on high)
+        run: npm audit --omit=dev --audit-level=high
 
       - name: Lint
         run: npm run lint
@@ -52,15 +61,18 @@ jobs:
       - name: Test with coverage
         run: npm run test:coverage
 
+      # Coverage is gated locally by the vitest thresholds (vitest.config.ts);
+      # the Codecov upload is informational and must not break CI when the
+      # CODECOV_TOKEN secret is not configured (e.g. on fresh forks).
       - name: Upload coverage reports to Codecov
-        if: matrix.node-version == 20
+        if: matrix.node-version == 20 && matrix.os == 'ubuntu-latest'
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false
 
       - name: Upload artifacts
-        if: matrix.node-version == 20
+        if: matrix.node-version == 20 && matrix.os == 'ubuntu-latest'
         uses: actions/upload-artifact@v7
         with:
           name: dist

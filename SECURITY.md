@@ -66,3 +66,29 @@ Disables TLS certificate validation, allowing the agent to visit sites with self
 **Consider a sandboxed environment.** For automation that involves untrusted content, or when the privileged modules are required, run Firefox inside an isolated environment (a container, VM, or dedicated OS user account), ideally with a network proxy to enforce outbound restrictions. This limits what an attacker can reach even if the agent is fully compromised.
 
 **Claude sandbox does not cover MCP servers.** When using this server with Claude, Claude's process sandbox does not extend to MCP servers it starts — the MCP server process runs with your full user privileges. Users who want to restrict the server's OS-level access can explore Anthropic's [Sandbox Runtime](https://github.com/anthropic-experimental/sandbox-runtime) to apply a sandbox to MCP servers independently. The same approach may apply when using other AI agents.
+
+## Localhost trust model
+
+The server is designed around a simple local trust boundary — it does not
+authenticate anything:
+
+- **stdio-only transport.** The MCP interface is a stdin/stdout pipe to the
+  agent process that spawned the server; there is no network endpoint. Access
+  control is therefore whatever your OS gives you: only processes that can
+  attach to that pipe can use the server. Keep it that way (user-scoped
+  session, container, or VM) — never relaying the server through an
+  unauthenticated network proxy.
+- **Local browser endpoints are trusted without authentication.** The
+  geckodriver the server starts, and — with `--connect-existing` — the
+  Marionette port of an already-running Firefox, are reached on localhost
+  without any shared secret. Any local process that knows the port can talk
+  to the browser.
+- **The server inherits its launch environment.** Environment variables,
+  credentials, and file permissions of the launching process are available
+  to the server and to the agent's tool actions. Run the server as a
+  dedicated user or in a container so that "the agent" and "your machine"
+  have the same blast radius by design.
+
+This is normal for stdio-based MCP servers, but it is the reason the
+dedicated-profile and sandboxed-environment guidance above matters: the
+server itself adds no identity layer on top of your local process isolation.

@@ -12,7 +12,7 @@ export const nodeConfig = {
   minify: false,
   sourcemap: false,
   clean: true,
-  dts: false,
+  dts: true,
   platform: 'node',
   splitting: false,
   external: ['selenium-webdriver'],

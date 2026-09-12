@@ -168,7 +168,8 @@ describe('FirefoxCore', () => {
 
         const closePromise = core.close();
 
-        await vi.advanceTimersByTimeAsync(5500);
+        // The quit() timeout is 15000ms in close(); advance just past it.
+        await vi.advanceTimersByTimeAsync(15500);
         await closePromise;
 
         expect(onQuit).toHaveBeenCalled();
@@ -285,6 +286,53 @@ describe('FirefoxCore', () => {
         }
       }
     });
+
+    it('should complete when no browser process matches the session profile', async () => {
+      const core = new FirefoxCore({ headless: true });
+      (core as any).driver = {
+        quit: vi.fn().mockResolvedValue(undefined),
+      };
+      // A directory nothing is running with: the scoped process check finds
+      // no match and close() must neither hang nor throw.
+      (core as any).sessionProfileDir = `/tmp/fdmcp-close-test-${process.pid}-${Date.now()}`;
+
+      await core.close();
+
+      expect((core as any).sessionProfileDir).toBeUndefined();
+    });
+
+    it('should clear an already-stopped session geckodriver PID', async () => {
+      const core = new FirefoxCore({ headless: true });
+      (core as any).driver = { quit: vi.fn().mockResolvedValue(undefined) };
+      (core as any).sessionGeckodriverPid = 2147483647;
+
+      await core.close();
+
+      expect((core as any).sessionGeckodriverPid).toBeUndefined();
+    });
+
+    it('should kill only the recorded geckodriver PID when it does not exit', async () => {
+      vi.useFakeTimers();
+      const kill = vi.spyOn(process, 'kill').mockImplementation(() => true);
+      try {
+        const core = new FirefoxCore({ headless: true });
+        (core as any).sessionGeckodriverPid = 424242;
+
+        const cleanup = (core as any).ensureSessionGeckodriverGone();
+        await vi.advanceTimersByTimeAsync(10_000);
+        await cleanup;
+
+        if (process.platform === 'win32') {
+          expect(kill).not.toHaveBeenCalled();
+        } else {
+          expect(kill).toHaveBeenLastCalledWith(424242, 'SIGKILL');
+        }
+        expect((core as any).sessionGeckodriverPid).toBeUndefined();
+      } finally {
+        kill.mockRestore();
+        vi.useRealTimers();
+      }
+    });
   });
 });
 
@@ -365,6 +413,10 @@ describe('FirefoxCore connect() profile handling', () => {
       copyFileSync: vi.fn(),
       openSync: vi.fn().mockReturnValue(3),
       closeSync: vi.fn(),
+      // Used by rotateFirefoxLogs(); empty dir means nothing to rotate.
+      readdirSync: vi.fn().mockReturnValue([]),
+      statSync: vi.fn(),
+      unlinkSync: vi.fn(),
     }));
   });
 
